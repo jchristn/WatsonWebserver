@@ -14,7 +14,7 @@ namespace WatsonWebserver
     public class Server : IDisposable
     {
         #region Public-Members
-        
+
         /// <summary>
         /// Indicates whether or not the server is listening.
         /// </summary>
@@ -23,9 +23,9 @@ namespace WatsonWebserver
             get
             {
                 return (_HttpListener != null) ? _HttpListener.IsListening : false;
-            } 
+            }
         }
-         
+
         /// <summary>
         /// Number of requests being serviced currently.
         /// </summary>
@@ -94,10 +94,10 @@ namespace WatsonWebserver
         private WatsonWebserverRoutes _Routes = new WatsonWebserverRoutes();
         private HttpListener _HttpListener = new HttpListener();
         private int _RequestCount = 0;
-         
+
         private CancellationTokenSource _TokenSource = new CancellationTokenSource();
         private CancellationToken _Token;
-        private Task _AcceptConnections = null; 
+        private Task _AcceptConnections = null;
 
         #endregion
 
@@ -147,7 +147,7 @@ namespace WatsonWebserver
             _Settings = new WatsonWebserverSettings(hostnames, port, ssl);
             _Routes.Default = defaultRoute;
         }
-        
+
         #endregion
 
         #region Public-Methods
@@ -204,7 +204,7 @@ namespace WatsonWebserver
             {
                 _HttpListener.Prefixes.Add(prefix);
             }
-            
+
             _HttpListener.Start();
             _AcceptConnections = Task.Run(() => AcceptConnections(_Token), _Token);
             return _AcceptConnections;
@@ -242,7 +242,7 @@ namespace WatsonWebserver
             {
                 if (_HttpListener != null && _HttpListener.IsListening)
                 {
-                    Stop(); 
+                    Stop();
 
                     _HttpListener.Close();
                 }
@@ -254,7 +254,7 @@ namespace WatsonWebserver
                 _Routes = null;
                 _TokenSource = null;
                 _AcceptConnections = null;
-                 
+
                 Events = null;
                 Statistics = null;
             }
@@ -262,6 +262,10 @@ namespace WatsonWebserver
 
         private void LoadRoutes()
         {
+            var routeClasses = _Assembly
+                .GetTypes()  // Get all classes from assembly
+                .Where(p => p.GetCustomAttributes().OfType<RoutePrefixAttribute>().Any()); // Only select classes (static or non-static) that have Route attribute
+
             var staticRoutes = _Assembly
                 .GetTypes() // Get all classes from assembly
                 .SelectMany(x => x.GetMethods()) // Get all methods from assembly
@@ -284,6 +288,27 @@ namespace WatsonWebserver
                 {
                     Events.Logger?.Invoke(_Header + "adding static route " + attribute.Method.ToString() + " " + attribute.Path);
                     _Routes.Static.Add(attribute.Method, attribute.Path, ToRouteMethod(staticRoute), attribute.GUID, attribute.Metadata);
+                }
+            }
+
+            foreach (var cls in routeClasses)
+            {
+                var routePrefix = cls.GetCustomAttribute<RoutePrefixAttribute>().RoutePrefix;
+                foreach (var method in cls.GetMethods())
+                {
+                    var get = method.GetCustomAttribute<HttpGetAttribute>();
+                    if (get != null)
+                    {
+                        Events.Logger?.Invoke(_Header + $"adding GET route {cls.Name}.{get.MethodName ?? method.Name}");
+                        _Routes.Routes.AddRoute(routePrefix, get.MethodName ?? method.Name, cls, method, HttpMethod.GET);
+                    }
+
+                    var post = method.GetCustomAttribute<HttpPostAttribute>();
+                    if (post != null)
+                    {
+                        Events.Logger?.Invoke(_Header + $"adding POST route {cls.Name}.{post.MethodName ?? method.Name}");
+                        _Routes.Routes.AddRoute(routePrefix, post.MethodName ?? method.Name, cls, method, HttpMethod.POST);
+                    }
                 }
             }
 
@@ -348,7 +373,7 @@ namespace WatsonWebserver
         private async Task AcceptConnections(CancellationToken token)
         {
             try
-            { 
+            {
                 #region Process-Requests
 
                 while (_HttpListener.IsListening)
@@ -362,7 +387,7 @@ namespace WatsonWebserver
                     HttpListenerContext listenerCtx = await _HttpListener.GetContextAsync().ConfigureAwait(false);
                     Interlocked.Increment(ref _RequestCount);
                     HttpContext ctx = null;
-                     
+
                     Task unawaited = Task.Run(async () =>
                     {
                         DateTime startTime = DateTime.Now;
@@ -374,7 +399,7 @@ namespace WatsonWebserver
                             Events.HandleConnectionReceived(this, new ConnectionEventArgs(
                                 listenerCtx.Request.RemoteEndPoint.Address.ToString(),
                                 listenerCtx.Request.RemoteEndPoint.Port));
-                             
+
                             ctx = new HttpContext(listenerCtx, _Settings, Events);
 
                             Events.HandleRequestReceived(this, new RequestEventArgs(ctx));
@@ -388,11 +413,11 @@ namespace WatsonWebserver
 
                             Statistics.IncrementRequestCounter(ctx.Request.Method);
                             Statistics.IncrementReceivedPayloadBytes(ctx.Request.ContentLength);
-                             
+
                             #endregion
 
                             #region Check-Access-Control
-                             
+
                             if (!_Settings.AccessControl.Permit(ctx.Request.Source.IpAddress))
                             {
                                 Events.HandleRequestDenied(this, new RequestEventArgs(ctx));
@@ -405,7 +430,7 @@ namespace WatsonWebserver
                                 listenerCtx.Response.Close();
                                 return;
                             }
-                             
+
                             #endregion
 
                             #region Process-Preflight-Requests
@@ -423,9 +448,9 @@ namespace WatsonWebserver
 
                                     await _Routes.Preflight(ctx).ConfigureAwait(false);
                                     return;
-                                } 
+                                }
                             }
-                             
+
                             #endregion
 
                             #region Pre-Routing-Handler
@@ -450,7 +475,7 @@ namespace WatsonWebserver
                             #endregion
 
                             #region Content-Routes
-                             
+
                             if (ctx.Request.Method == HttpMethod.GET || ctx.Request.Method == HttpMethod.HEAD)
                             {
                                 ContentRoute cr = null;
@@ -465,9 +490,28 @@ namespace WatsonWebserver
 
                                     ctx.RouteType = RouteTypeEnum.Content;
                                     ctx.Route = cr;
-                                    await _Routes.ContentHandler.Process(ctx, token).ConfigureAwait(false); 
+                                    await _Routes.ContentHandler.Process(ctx, token).ConfigureAwait(false);
                                     return;
-                                } 
+                                }
+                            }
+
+                            #endregion
+
+                            #region Route
+                            var apiControllerMethod = _Routes.Routes.Match(ctx.Request);
+                            if (apiControllerMethod != null)
+                            {
+                                if (_Settings.Debug.Routing)
+                                {
+                                    Events.Logger?.Invoke(
+                                        _Header + "route for " + ctx.Request.Source.IpAddress + ":" + ctx.Request.Source.Port + " " +
+                                        ctx.Request.Method.ToString() + " " + ctx.Request.Url.RawWithoutQuery);
+                                }
+
+                                ctx.RouteType = RouteTypeEnum.Route;
+                                ctx.Route = apiControllerMethod;
+                                await apiControllerMethod.Invoke(ctx).ConfigureAwait(false);
+                                return;
                             }
 
                             #endregion
@@ -592,23 +636,23 @@ namespace WatsonWebserver
                 }
 
                 #endregion
-            } 
+            }
             catch (TaskCanceledException)
-            { 
+            {
             }
             catch (OperationCanceledException)
-            { 
+            {
             }
             catch (Exception e)
             {
                 Events.HandleExceptionEncountered(this, new ExceptionEventArgs(null, e));
-            } 
+            }
             finally
             {
                 Events.HandleServerStopped(this, EventArgs.Empty);
             }
         }
-          
+
         private double TotalMsFrom(DateTime startTime)
         {
             try
@@ -622,7 +666,7 @@ namespace WatsonWebserver
                 return -1;
             }
         }
-         
+
         #endregion
     }
 }

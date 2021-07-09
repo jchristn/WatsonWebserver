@@ -19,6 +19,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test.MaxConnections", "Test
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test.Loopback", "Test.Loopback\Test.Loopback.csproj", "{44D73B03-5EEE-45FE-8E0E-61D3E13400F0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test.Parameters", "Test.Parameters\Test.Parameters.csproj", "{E5611486-32E6-4461-86EC-333198CF95AD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,10 @@ Global
 		{44D73B03-5EEE-45FE-8E0E-61D3E13400F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{44D73B03-5EEE-45FE-8E0E-61D3E13400F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{44D73B03-5EEE-45FE-8E0E-61D3E13400F0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E5611486-32E6-4461-86EC-333198CF95AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E5611486-32E6-4461-86EC-333198CF95AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E5611486-32E6-4461-86EC-333198CF95AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E5611486-32E6-4461-86EC-333198CF95AD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

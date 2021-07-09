@@ -1050,6 +1050,21 @@
             <param name="pr">Matching route.</param>
             <returns>True if match exists.</returns>
         </member>
+        <member name="F:WatsonWebserver.ApiControllerMethodInfo.ContextField">
+            <summary>
+            Controller class Context field
+            </summary>
+        </member>
+        <member name="T:WatsonWebserver.ApiControllerBase">
+            <summary>
+            Defines properties and methods for API controller.
+            </summary>
+        </member>
+        <member name="T:WatsonWebserver.RoutePrefixAttribute">
+            <summary>
+            Annotates a controller with a route prefix that applies to all actions within the controller.
+            </summary>
+        </member>
         <member name="T:WatsonWebserver.RequestEventArgs">
             <summary>
             Request event arguments.
@@ -1178,6 +1193,11 @@
         <member name="F:WatsonWebserver.RouteTypeEnum.Dynamic">
             <summary>
             Dynamic route.
+            </summary>
+        </member>
+        <member name="F:WatsonWebserver.RouteTypeEnum.Route">
+            <summary>
+            Route.
             </summary>
         </member>
         <member name="T:WatsonWebserver.StaticRoute">
@@ -1535,6 +1555,11 @@
         <member name="P:WatsonWebserver.WatsonWebserverRoutes.Static">
             <summary>
             Static routes; i.e. routes with explicit matching and any HTTP method.
+            </summary>
+        </member>
+        <member name="P:WatsonWebserver.WatsonWebserverRoutes.Routes">
+            <summary>
+            Routes for static controllers or non-static (controller based) controllers
             </summary>
         </member>
         <member name="P:WatsonWebserver.WatsonWebserverRoutes.Parameter">
