@@ -35,6 +35,11 @@ namespace WatsonWebserver
         /// Dynamic route.
         /// </summary>
         [EnumMember(Value = "Dynamic")]
-        Dynamic
+        Dynamic,
+        /// <summary>
+        /// Route.
+        /// </summary>
+        [EnumMember(Value = "Route")]
+        Route
     }
 }

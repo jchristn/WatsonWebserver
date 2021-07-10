@@ -49,7 +49,7 @@ namespace WatsonWebserver
                 _ReceivedPayloadBytes = value;
             }
         }
-         
+
         /// <summary>
         /// The number of payload bytes sent (outgoing request body).
         /// </summary>
@@ -64,16 +64,15 @@ namespace WatsonWebserver
                 _SentPayloadBytes = value;
             }
         }
-          
+
         #endregion
 
         #region Private-Members
 
         private DateTime _StartTime = DateTime.Now.ToUniversalTime();
-        private long _ReceivedPayloadBytes = 0; 
+        private long _ReceivedPayloadBytes = 0;
         private long _SentPayloadBytes = 0;
-        private readonly object _DictionaryLock = new object();
-        private Dictionary<HttpMethod, long> _RequestsByMethod = new Dictionary<HttpMethod, long>();
+        private long[] _RequestsByMethod; // _RequestsByMethod[(int)HttpMethod.Xyz] = Count
 
         #endregion
 
@@ -84,7 +83,15 @@ namespace WatsonWebserver
         /// </summary>
         public WatsonWebserverStatistics()
         {
+            // Calculating the length for _RequestsByMethod array
+            int max = 0;
+            foreach (var value in Enum.GetValues(typeof(HttpMethod)))
+            {
+                if ((int)value > max)
+                    max = (int)value;
+            }
 
+            _RequestsByMethod = new long[max + 1];
         }
 
         #endregion
@@ -97,31 +104,29 @@ namespace WatsonWebserver
         /// <returns>String.</returns>
         public override string ToString()
         {
-            string ret =
-                "--- Statistics ---" + Environment.NewLine +
-                "    Start Time     : " + StartTime.ToString() + Environment.NewLine +
-                "    Up Time        : " + UpTime.ToString() + Environment.NewLine +
-                "    Received Payload Bytes : " + ReceivedPayloadBytes + " bytes" + Environment.NewLine +
-                "    Sent Payload Bytes     : " + SentPayloadBytes + " bytes" + Environment.NewLine +
-                "    Requests By Method     : " + Environment.NewLine;
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine($"--- Statistics ---");
+            sb.AppendLine($"    Start Time     : {StartTime}");
+            sb.AppendLine($"    Up Time        : {UpTime}");
+            sb.AppendLine($"    Received Payload Bytes : {ReceivedPayloadBytes.ToString("N0")} bytes");
+            sb.AppendLine($"    Sent Payload Bytes     : {SentPayloadBytes.ToString("N0")} bytes");
+            sb.AppendLine($"    Requests By Method     : ");
 
-            lock (_DictionaryLock)
+            bool foundAtLeastOne = false;
+            for (int i = 0; i < _RequestsByMethod.Length; i++)
             {
-                if (_RequestsByMethod.Count > 0)
+                var count = Interlocked.Read(ref _RequestsByMethod[i]);
+                if (count > 0)
                 {
-                    foreach (KeyValuePair<HttpMethod, long> curr in _RequestsByMethod)
-                    {
-                        ret +=
-                            "        " + curr.Key.ToString().PadRight(18) + " : " + curr.Value + Environment.NewLine;
-                    }
-                }
-                else
-                {
-                    ret += "        (none)" + Environment.NewLine; 
+                    foundAtLeastOne = true;
+                    sb.AppendLine($"        { ((HttpMethod)i).ToString().PadRight(18)} : {count.ToString("N0")}");
                 }
             }
 
-            return ret;
+            if (!foundAtLeastOne)
+                sb.AppendLine("        (none)");
+
+            return sb.ToString();
         }
 
         /// <summary>
@@ -129,12 +134,11 @@ namespace WatsonWebserver
         /// </summary>
         public void Reset()
         {
-            lock (_DictionaryLock)
-            {
-                _ReceivedPayloadBytes = 0;
-                _SentPayloadBytes = 0;
-                _RequestsByMethod = new Dictionary<HttpMethod, long>();
-            }
+            Interlocked.Exchange(ref _ReceivedPayloadBytes, 0);
+            Interlocked.Exchange(ref _SentPayloadBytes, 0);
+
+            for (int i = 0; i < _RequestsByMethod.Length; i++)
+                Interlocked.Exchange(ref _RequestsByMethod[i], 0);
         }
 
         /// <summary>
@@ -144,11 +148,7 @@ namespace WatsonWebserver
         /// <returns>Number of requests received using this method.</returns>
         public long RequestCountByMethod(HttpMethod method)
         {
-            lock (_DictionaryLock)
-            {
-                if (_RequestsByMethod.ContainsKey(method)) return _RequestsByMethod[method];
-                else return 0;
-            }
+            return Interlocked.Read(ref _RequestsByMethod[(int)method]);
         }
 
         #endregion
@@ -157,20 +157,7 @@ namespace WatsonWebserver
 
         internal void IncrementRequestCounter(HttpMethod method)
         {
-            lock (_DictionaryLock)
-            {
-                if (_RequestsByMethod.ContainsKey(method))
-                {
-                    long val = _RequestsByMethod[method];
-                    val = val + 1;
-                    _RequestsByMethod.Remove(method);
-                    _RequestsByMethod.Add(method, val);
-                }
-                else
-                {
-                    _RequestsByMethod.Add(method, 1);
-                }
-            }
+            Interlocked.Increment(ref _RequestsByMethod[(int)method]);
         }
 
         internal void IncrementReceivedPayloadBytes(long len)
